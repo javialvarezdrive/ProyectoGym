@@ -4,20 +4,13 @@ import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from utils.auth import check_login
-from utils.database import (
-    get_usuarios,
-    get_tipos_actividad,
-    crear_actividad,
-    get_actividades,
-    actualizar_actividad,
-    get_monitores
-)
+from utils.database import get_usuarios, get_tipos_actividad, crear_actividad, get_actividades, actualizar_actividad, get_monitores
 from utils.helpers import format_date
 
 def extraer_nombre_actividad(row):
     """
-    Extrae el nombre de la actividad desde la información en "tipos_actividad". 
-    Se maneja si se retorna como lista o diccionario.
+    Extrae el nombre de la actividad desde la información en "tipos_actividad".
+    Soporta formatos lista o diccionario.
     """
     tipo_info = row.get("tipos_actividad")
     if tipo_info:
@@ -29,7 +22,7 @@ def extraer_nombre_actividad(row):
 
 def agendar_actividad():
     st.header("Agendar actividad")
-    st.info("Programa una actividad sin asignar usuario. Luego podrás asignar usuarios en la pestaña 'Asignar usuarios'.")
+    st.info("Programa una actividad sin asignar usuario. Podrás asignar usuarios en la pestaña 'Asignar usuarios'.")
     
     with st.form("form_agendar"):
         # Selección opcional de monitor:
@@ -40,7 +33,6 @@ def agendar_actividad():
             if monitor_sel == "(Usar monitor logueado)":
                 monitor_id = st.session_state.user["id"]
             else:
-                # Buscamos el monitor por la cadena completa "nombre apellido"
                 selected = monitor_sel.strip()
                 fila = monitores_df[monitores_df.apply(lambda row: f"{row['nombre']} {row['apellidos']}" == selected, axis=1)]
                 if not fila.empty:
@@ -49,15 +41,16 @@ def agendar_actividad():
                     monitor_id = st.session_state.user["id"]
         else:
             monitor_id = st.session_state.user["id"]
-        
+
         # Seleccionar tipo de actividad
         tipos_df = get_tipos_actividad()
         if tipos_df.empty:
             st.error("No hay tipos de actividad definidos.")
             return
         tipo_sel = st.selectbox("Tipo de Actividad", tipos_df["nombre"].tolist())
+        # Se extrae el id del tipo según el nombre seleccionado
         tipo_id = tipos_df[tipos_df["nombre"] == tipo_sel]["id"].values[0]
-            
+        
         fecha = st.date_input("Fecha", min_value=datetime.today())
         turno = st.selectbox("Turno", ["Mañana", "Tarde", "Noche"])
         observaciones = st.text_area("Observaciones", height=100)
@@ -88,7 +81,8 @@ def asignar_usuarios():
          "fecha_fin": fecha_fin.isoformat(),
          "turno": filtro_turno
     }
-    df_acts = get_actividades(filtros)  # Se muestran todas las actividades en ese rango
+    # Se muestran todas las actividades en ese rango
+    df_acts = get_actividades(filtros)
     
     if not df_acts.empty:
          st.subheader("Actividades en el rango seleccionado")
@@ -107,7 +101,7 @@ def asignar_usuarios():
          df_disp = pd.DataFrame(datos)
          st.dataframe(df_disp, use_container_width=True)
          
-         # Generar opciones para seleccionar la actividad (sin mostrar el ID)
+         # Selección de actividad (sin mostrar ID)
          mapping = {}
          opciones = []
          for _, row in df_acts.iterrows():
