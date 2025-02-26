@@ -1,16 +1,56 @@
 # pages/actividades.py
+
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
 from utils.auth import check_login
-from utils.database import get_usuarios, get_tipos_actividad, crear_actividad, get_actividades, actualizar_actividad
+from utils.database import (
+    get_usuarios,
+    get_tipos_actividad,
+    crear_actividad,
+    get_actividades,
+    actualizar_actividad,
+    get_monitores
+)
 from utils.helpers import format_date
+
+def extraer_nombre_actividad(row):
+    """
+    Extrae el nombre de la actividad desde la información en "tipos_actividad". 
+    Se maneja si se retorna como lista o diccionario.
+    """
+    tipo_info = row.get("tipos_actividad")
+    if tipo_info:
+        if isinstance(tipo_info, list) and len(tipo_info) > 0:
+            return tipo_info[0].get("nombre", "Actividad no definida")
+        elif isinstance(tipo_info, dict):
+            return tipo_info.get("nombre", "Actividad no definida")
+    return "Actividad no definida"
 
 def agendar_actividad():
     st.header("Agendar actividad")
     st.info("Programa una actividad sin asignar usuario. Luego podrás asignar usuarios en la pestaña 'Asignar usuarios'.")
+    
     with st.form("form_agendar"):
-        # En esta pestaña no se elige usuario; se envía usuario_id = None.
+        # Selección opcional de monitor:
+        monitores_df = get_monitores()
+        if monitores_df is not None and not monitores_df.empty:
+            opciones_monitores = ["(Usar monitor logueado)"] + monitores_df.apply(lambda row: f"{row['nombre']} {row['apellidos']}", axis=1).tolist()
+            monitor_sel = st.selectbox("Monitor (opcional)", options=opciones_monitores)
+            if monitor_sel == "(Usar monitor logueado)":
+                monitor_id = st.session_state.user["id"]
+            else:
+                # Buscamos el monitor por la cadena completa "nombre apellido"
+                selected = monitor_sel.strip()
+                fila = monitores_df[monitores_df.apply(lambda row: f"{row['nombre']} {row['apellidos']}" == selected, axis=1)]
+                if not fila.empty:
+                    monitor_id = fila["id"].values[0]
+                else:
+                    monitor_id = st.session_state.user["id"]
+        else:
+            monitor_id = st.session_state.user["id"]
+        
+        # Seleccionar tipo de actividad
         tipos_df = get_tipos_actividad()
         if tipos_df.empty:
             st.error("No hay tipos de actividad definidos.")
@@ -23,27 +63,18 @@ def agendar_actividad():
         observaciones = st.text_area("Observaciones", height=100)
         
         if st.form_submit_button("Agendar actividad"):
-            res = crear_actividad(None, tipo_id, fecha.isoformat(), turno, st.session_state.user["id"], observaciones)
+            # Se agenda la actividad sin usuario (usuario_id = None)
+            res = crear_actividad(None, tipo_id, fecha.isoformat(), turno, monitor_id, observaciones)
             if res.data:
                 st.success("Actividad agendada correctamente (sin usuario asignado).")
             else:
                 st.error("Error al agendar la actividad.")
 
-def extraer_actividad(row):
-    # Extrae el nombre de la actividad desde la información de tipos_actividad 
-    tipo_info = row.get("tipos_actividad")
-    if tipo_info:
-        if isinstance(tipo_info, list) and len(tipo_info) > 0:
-            return tipo_info[0].get("nombre", "Actividad no definida")
-        elif isinstance(tipo_info, dict):
-            return tipo_info.get("nombre", "Actividad no definida")
-    return "Actividad no definida"
-
 def asignar_usuarios():
     st.header("Asignar usuarios a actividades")
     st.info("Filtra y selecciona una actividad para asignarle un usuario.")
     
-    # Rango de fechas por defecto: hoy hasta hoy + 1 mes
+    # Rango de fechas por defecto: desde hoy hasta hoy + 1 mes
     col_a1, col_a2, col_a3 = st.columns(3)
     with col_a1:
          fecha_inicio = st.date_input("Fecha Inicial", value=datetime.today(), key="asig_fecha_inicio")
@@ -57,17 +88,15 @@ def asignar_usuarios():
          "fecha_fin": fecha_fin.isoformat(),
          "turno": filtro_turno
     }
-    df_acts = get_actividades(filtros)  # Todas las actividades en el rango
+    df_acts = get_actividades(filtros)  # Se muestran todas las actividades en ese rango
     
     if not df_acts.empty:
          st.subheader("Actividades en el rango seleccionado")
          datos = []
-         # Construir las columnas para el listado
          for _, row in df_acts.iterrows():
               fecha_str = format_date(row["fecha"])
               turno_val = row.get("turno", "")
-              actividad_nombre = extraer_actividad(row)
-              # Usuarios asignados según campo usuario_id: 1 si tiene, 0 si no tiene
+              actividad_nombre = extraer_nombre_actividad(row)
               num_asignados = 1 if row.get("usuario_id") is not None else 0
               datos.append({
                    "Fecha": fecha_str,
@@ -78,13 +107,13 @@ def asignar_usuarios():
          df_disp = pd.DataFrame(datos)
          st.dataframe(df_disp, use_container_width=True)
          
-         # Preparar opciones del selectbox sin mostrar el ID, con label "Fecha - Turno - Actividad"
+         # Generar opciones para seleccionar la actividad (sin mostrar el ID)
          mapping = {}
          opciones = []
          for _, row in df_acts.iterrows():
               fecha_str = format_date(row["fecha"])
               turno_val = row.get("turno", "")
-              actividad_nombre = extraer_actividad(row)
+              actividad_nombre = extraer_nombre_actividad(row)
               label = f"{fecha_str} - {turno_val} - {actividad_nombre}"
               mapping[label] = row.get("id")
               opciones.append(label)
@@ -134,7 +163,7 @@ def asignar_usuarios():
     else:
          st.warning("No hay actividades en el rango seleccionado.")
 
-def main():
+def main_wrapper():
     check_login()
     st.title("Gestión de Actividades")
     tabs = st.tabs(["Agendar actividad", "Asignar usuarios"])
@@ -144,4 +173,4 @@ def main():
          asignar_usuarios()
 
 if __name__ == "__main__":
-    main()
+    main_wrapper()
