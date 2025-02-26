@@ -56,29 +56,36 @@ def main():
             f_fin = st.date_input("Fecha Final")
             filtros["fecha_fin"] = f_fin.isoformat()
         with col3:
-            turno_sel = st.selectbox("Turno", ["", "Mañana", "Tarde", "Noche"])
-            filtros["turno"] = turno_sel
+            filtro_turno = st.selectbox("Turno", ["", "Mañana", "Tarde", "Noche"])
+            filtros["turno"] = filtro_turno
         
         df_acts = get_actividades(filtros)
         if not df_acts.empty:
             datos = []
             for _, row in df_acts.iterrows():
-                # Acceso seguro a la información del usuario (puede no existir en actividades sin usuario asignado)
-                usuario = row.get("usuarios") or {}
-                usuario_nip = usuario.get("nip", "N/A")
-                usuario_nombre = usuario.get("nombre", "No asignado")
-                usuario_apellidos = usuario.get("apellidos", "")
-                # Acceso seguro al tipo de actividad
+                # Uso seguro de la información del usuario
+                usuario = row.get("usuarios")
+                # Extraer el nombre del tipo de actividad (siempre definida en la tabla de tipos)
                 tipo = row.get("tipos_actividad") or {}
-                actividad = tipo.get("nombre", "Desconocido")
-                # Acceso a la información del monitor
+                actividad = tipo.get("nombre", "Actividad no definida")
+                if usuario and usuario.get("nombre"):
+                    usuario_nip = usuario.get("nip", "N/A")
+                    usuario_nombre = usuario.get("nombre")
+                    usuario_apellidos = usuario.get("apellidos", "")
+                    usuario_label = f"{usuario_nip} - {usuario_nombre} {usuario_apellidos}"
+                else:
+                    # Si no hay usuario asignado, se muestra la actividad programada
+                    usuario_label = f"Programado: {actividad}"
+                
+                # Información del monitor
                 monitor = row.get("monitores") or {}
                 monitor_nombre = monitor.get("nombre", "Desconocido")
                 monitor_apellidos = monitor.get("apellidos", "")
+                
                 datos.append({
                     "Fecha": format_date(row["fecha"]),
                     "Turno": row.get("turno", ""),
-                    "Usuario": f"{usuario_nip} - {usuario_nombre} {usuario_apellidos}",
+                    "Usuario": usuario_label,
                     "Actividad": actividad,
                     "Monitor": f"{monitor_nombre} {monitor_apellidos}",
                     "Completada": "Sí" if row.get("completada") else "No"
