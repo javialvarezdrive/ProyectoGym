@@ -10,7 +10,7 @@ def main():
     check_login()
     st.title("Calendario de Actividades")
     
-    # Selección de mes, año y vista
+    # Seleccionar mes, año y vista
     col1, col2, col3 = st.columns(3)
     with col1:
         mes = st.selectbox("Mes", list(range(1, 13)), index=datetime.now().month - 1)
@@ -19,7 +19,7 @@ def main():
     with col3:
         vista = st.selectbox("Vista", ["Mensual", "Semanal", "Diaria"])
         
-    # Definir el rango de fechas según la vista seleccionada
+    # Definir rango de fechas según la vista
     if vista == "Mensual":
         fecha_inicio = datetime(año, mes, 1)
         if mes < 12:
@@ -38,13 +38,13 @@ def main():
         "fecha_fin": fecha_fin.isoformat()
     }
     
-    # Obtener las actividades desde Supabase
+    # Obtener actividades (se asume que la función get_actividades usa LEFT join en usuarios)
     df = get_actividades(filtros)
     
     if not df.empty:
         eventos = []
         for _, row in df.iterrows():
-            # Convertir la fecha a un objeto date si viene como string
+            # Convertir la fecha a objeto date (si viene como string)
             fecha = row["fecha"]
             if isinstance(fecha, str):
                 fecha = datetime.strptime(fecha, "%Y-%m-%d").date()
@@ -53,16 +53,19 @@ def main():
             tipo_act = row.get("tipos_actividad") or {}
             tipo_nombre = tipo_act.get("nombre", "Desconocido")
             
-            # Extraer la información del usuario; si no existe, se asignan valores por defecto
+            # Extraer datos del usuario asignado (si los hay)
             usuario = row.get("usuarios") or {}
-            usuario_nombre = usuario.get("nombre", "No asignado")
-            usuario_nip = usuario.get("nip") or "N/A"
-            usuario_apellidos = usuario.get("apellidos", "")
+            # Si no hay usuario asignado (o nombre vacío), mostramos solo el tipo de actividad
+            usuario_nombre = usuario.get("nombre")
+            if usuario_nombre is None or usuario_nombre.strip() == "":
+                title_event = f"{tipo_nombre}"
+            else:
+                title_event = f"{tipo_nombre} - {usuario_nombre}"
             
-            # Elegir un color de fondo según el tipo de actividad
+            # Elegir color según el tipo de actividad
             color = "#FF5733" if tipo_nombre == "Defensa Personal" else "#33A1FF"
             
-            # Definir las horas de inicio y fin en función del turno
+            # Definir horas según el turno
             turno = row.get("turno")
             if turno == "Mañana":
                 inicio_h, fin_h = "09:00", "11:00"
@@ -71,16 +74,22 @@ def main():
             else:
                 inicio_h, fin_h = "20:00", "22:00"
             
+            # Preparar la descripción: si existe usuario, mostrar sus datos; si no, indicar que no hay asignación.
+            if usuario:
+                descripcion = f"Usuario: {usuario.get('nip', 'N/A')} - {usuario.get('nombre','')} {usuario.get('apellidos','')}"
+            else:
+                descripcion = "No hay usuarios asignados a esta actividad."
+            
             eventos.append({
                 "id": row.get("id"),
-                "title": f"{tipo_nombre} - {usuario_nombre}",
+                "title": title_event,
                 "start": f"{fecha.isoformat()}T{inicio_h}",
                 "end": f"{fecha.isoformat()}T{fin_h}",
                 "backgroundColor": color,
-                "description": f"Usuario: {usuario_nip} - {usuario_nombre} {usuario_apellidos}"
+                "description": descripcion
             })
         
-        # Opciones de configuración para el calendario interactivo
+        # Opciones para el calendario interactivo
         calendar_options = {
             "headerToolbar": {
                 "left": "prev,next today",
