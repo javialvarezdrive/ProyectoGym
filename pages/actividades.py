@@ -8,9 +8,9 @@ from utils.helpers import format_date
 
 def agendar_actividad():
     st.header("Agendar actividad")
-    st.info("Programa una actividad sin asignar usuario. Podrás asignar usuarios luego en la pestaña 'Asignar usuarios'.")
+    st.info("Programa una actividad sin asignar usuario. Podrás asignar usuarios en la pestaña 'Asignar usuarios'.")
     with st.form("form_agendar"):
-        # En esta pestaña NO se elige usuario
+        # En esta pestaña NO se elige usuario, se agenda con usuario_id = None.
         tipos_df = get_tipos_actividad()
         if tipos_df.empty:
             st.error("No hay tipos de actividad definidos.")
@@ -23,7 +23,7 @@ def agendar_actividad():
         observaciones = st.text_area("Observaciones", height=100)
         
         if st.form_submit_button("Agendar actividad"):
-            # Se envía usuario_id = None (sin asignación)
+            # Se agenda la actividad sin usuario (usuario_id = None)
             res = crear_actividad(None, tipo_id, fecha.isoformat(), turno, st.session_state.user["id"], observaciones)
             if res.data:
                 st.success("Actividad agendada correctamente (sin usuario asignado).")
@@ -34,7 +34,7 @@ def asignar_usuarios():
     st.header("Asignar usuarios a actividades")
     st.info("Filtra y selecciona una actividad sin usuario asignado para asignarle un usuario.")
     
-    # Paso 1: Filtrar actividades sin usuario asignado
+    # Filtrar actividades por fecha y turno.
     st.subheader("Filtrar actividades")
     col_a1, col_a2, col_a3 = st.columns(3)
     with col_a1:
@@ -49,11 +49,9 @@ def asignar_usuarios():
         "fecha_fin": fecha_fin.isoformat(),
         "turno": filtro_turno
     }
-    # Obtener actividades
     df_acts = get_actividades(filtros)
-    # Filtrar aquellas sin usuario asignado; suponemos que en el resultado, la columna "usuarios" es null o {}
-    if not df_acts.empty:
-        df_acts = df_acts[df_acts["usuarios"].isna() | (df_acts["usuarios"] == {})]
+    # Filtrar actividades sin usuario asignado usando la columna 'usuario_id'
+    df_acts = df_acts[df_acts["usuario_id"].isnull()]
     
     if not df_acts.empty:
         st.subheader("Actividades sin usuario asignado")
@@ -69,7 +67,7 @@ def asignar_usuarios():
         df_disp = pd.DataFrame(datos)
         st.dataframe(df_disp, use_container_width=True)
         
-        actividad_id = st.text_input("Ingrese el ID de la actividad a la que desea asignar un usuario", key="act_id")
+        actividad_id = st.text_input("Ingrese el ID de la actividad a asignar", key="act_id")
         if actividad_id:
             st.subheader("Filtrar usuarios")
             col_u1, col_u2, col_u3, col_u4, col_u5 = st.columns(5)
@@ -85,7 +83,6 @@ def asignar_usuarios():
                 filtro_grupo = st.selectbox("Grupo", ["", "G-1", "G-2", "G-3"], key="filtro_grupo")
             
             usuarios_df = get_usuarios(activo=None)
-            # Aplicar filtros a usuarios
             if filtro_nip:
                 usuarios_df = usuarios_df[usuarios_df["nip"].astype(str).str.contains(filtro_nip)]
             if filtro_nombre:
