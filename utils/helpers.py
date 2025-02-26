@@ -1,6 +1,4 @@
-# utils/helpers.py
-import pandas as pd
-import streamlit as st
+mport pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
@@ -33,30 +31,31 @@ def generate_activity_stats(activities_df):
     if activities_df.empty:
         return None, None, None
 
-    # Extraer datos anidados en columnas simples para el tipo de actividad.
-    # Se revisa si el valor es una lista (y se toma el primer elemento) o un diccionario.
-    activities_df["tipo_nombre"] = activities_df["tipos_actividad"].apply(
-        lambda x: x[0].get("nombre") if isinstance(x, list) and len(x) > 0 
-        else (x.get("nombre") if isinstance(x, dict) and "nombre" in x 
-              else "Desconocido")
-    )
+    # Función para extraer el nombre del tipo de actividad
+    def extraer_tipo(tipo_info):
+        if isinstance(tipo_info, list) and len(tipo_info) > 0:
+            return tipo_info[0].get("nombre", "Actividad no definida")
+        if isinstance(tipo_info, dict):
+            return tipo_info.get("nombre", "Actividad no definida")
+        return "Actividad no definida"
 
-    # De forma similar, extraemos la sección del usuario.
-    activities_df["usuario_seccion"] = activities_df["usuarios"].apply(
-        lambda x: x[0].get("seccion") if isinstance(x, list) and len(x) > 0 
-        else (x.get("seccion") if isinstance(x, dict) and "seccion" in x 
-              else "Desconocido")
-    )
-    
-    # Gráfico de pastel: Distribución por tipo de actividad
+    # Aplica la función para crear la columna "tipo_nombre"
+    activities_df["tipo_nombre"] = activities_df["tipos_actividad"].apply(extraer_tipo)
+
+    # Función para extraer la sección del usuario
+    def extraer_seccion(usuario):
+        if isinstance(usuario, list) and len(usuario) > 0:
+            return usuario[0].get("seccion", "N/A")
+        if isinstance(usuario, dict):
+            return usuario.get("seccion", "N/A")
+        return "N/A"
+
+    activities_df["usuario_seccion"] = activities_df["usuarios"].apply(extraer_seccion)
+
     fig1 = px.pie(activities_df, names="tipo_nombre", title="Distribución por Tipo de Actividad")
-    
-    # Gráfico de barras: Actividades por turno
     turno_group = activities_df.groupby("turno").size().reset_index(name="count")
     fig2 = px.bar(turno_group, x="turno", y="count", title="Actividades por Turno", color="turno")
-    
-    # Gráfico de barras: Actividades por sección
     seccion_group = activities_df.groupby("usuario_seccion").size().reset_index(name="count")
     fig3 = px.bar(seccion_group, x="usuario_seccion", y="count", title="Actividades por Sección", color="usuario_seccion")
-    
+
     return fig1, fig2, fig3
