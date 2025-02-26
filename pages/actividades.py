@@ -1,3 +1,4 @@
+# pages/actividades.py
 import streamlit as st
 import pandas as pd
 from datetime import datetime, timedelta
@@ -15,7 +16,7 @@ from utils.helpers import format_date, generate_activity_calendar
 def extraer_nombre_actividad(row):
     """
     Extrae el nombre de la actividad desde la información en "tipos_actividad".
-    Soporta formato lista (toma el primer elemento) o diccionario.
+    Soporta datos en forma de lista (se toma el primer elemento) o diccionario.
     """
     tipo_info = row.get("tipos_actividad")
     if tipo_info:
@@ -27,7 +28,7 @@ def extraer_nombre_actividad(row):
 
 def agendar_actividad():
     st.header("Agendar actividad")
-    st.info("Programa una actividad sin asignar usuario. Luego podrás asignar usuarios en la pestaña 'Asignar usuarios'.")
+    st.info("Programa una actividad sin asignar usuario. Podrás asignar usuarios en la pestaña 'Asignar usuarios'.")
     
     with st.form("form_agendar"):
         # Selección opcional de monitor:
@@ -59,7 +60,7 @@ def agendar_actividad():
         observaciones = st.text_area("Observaciones", height=100)
         
         if st.form_submit_button("Agendar actividad"):
-            # Agenda sin asignar usuario (usuario_id = None)
+            # Se agenda sin asignar usuario (usuario_id = None)
             res = crear_actividad(None, tipo_id, fecha.isoformat(), turno, monitor_id, observaciones)
             if res.data:
                 st.success("Actividad agendada correctamente (sin usuario asignado).")
@@ -69,8 +70,8 @@ def agendar_actividad():
 def asignar_usuarios():
     st.header("Asignar usuarios a actividades")
     st.info("Filtra y selecciona una actividad para asignarle un usuario.")
-
-    # Rango de fechas por defecto: desde hoy hasta hoy + 1 mes
+    
+    # Rango de fechas por defecto: de hoy hasta hoy + 1 mes
     col_a1, col_a2, col_a3 = st.columns(3)
     with col_a1:
         fecha_inicio = st.date_input("Fecha Inicial", value=datetime.today(), key="asig_fecha_inicio")
@@ -85,9 +86,9 @@ def asignar_usuarios():
         "turno": filtro_turno
     }
     
-    df_acts = get_actividades(filtros)  # Se muestran todas las actividades en ese rango
+    df_acts = get_actividades(filtros)  # Todas las actividades en el rango
     if not df_acts.empty:
-        # Crear listado de actividades sin mostrar el ID; el label es "Fecha - Turno - Actividad"
+        # Listado de actividades: mostramos columnas Fecha, Turno, Actividad y "Usuarios asignados"
         datos = []
         for _, row in df_acts.iterrows():
             fecha_str = format_date(row["fecha"])
@@ -103,7 +104,7 @@ def asignar_usuarios():
         df_disp = pd.DataFrame(datos)
         st.dataframe(df_disp, use_container_width=True)
         
-        # Crear selectbox para elegir la actividad (label sin ID)
+        # Selectbox para elegir la actividad a asignar (etiqueta "Fecha - Turno - Actividad")
         mapping = {}
         opciones = []
         for _, row in df_acts.iterrows():
@@ -145,7 +146,9 @@ def asignar_usuarios():
         st.dataframe(usuarios_df, use_container_width=True)
         
         if not usuarios_df.empty:
-            opciones_usuarios = usuarios_df.apply(lambda row: f"{row['nip']} - {row['nombre']} {row['apellidos']}", axis=1).tolist()
+            opciones_usuarios = usuarios_df.apply(
+                lambda r: f"{r['nip']} - {r['nombre']} {r['apellidos']}", axis=1
+            ).tolist()
             usuario_sel = st.selectbox("Seleccione el usuario a asignar", opciones_usuarios)
             usuario_nip = int(usuario_sel.split(" - ")[0])
             usuario_id = usuarios_df[usuarios_df["nip"] == usuario_nip]["id"].values[0]
