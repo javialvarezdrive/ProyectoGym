@@ -1,37 +1,33 @@
-mport pandas as pd
+# utils/helpers.py
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from datetime import datetime
 
 def format_date(date_str):
-    """Convierte una fecha con formato AAAA-MM-DD a DD/MM/AAAA."""
     if isinstance(date_str, str):
-        return datetime.strptime(date_str, '%Y-%m-%d').strftime('%d/%m/%Y')
-    return date_str.strftime('%d/%m/%Y')
+        return datetime.strptime(date_str, "%Y-%m-%d").strftime("%d/%m/%Y")
+    return date_str.strftime("%d/%m/%Y")
 
 def generate_activity_calendar(activities_df):
-    """Genera un heatmap interactivo con Plotly para visualizar la distribución de actividades."""
     if activities_df.empty:
         return go.Figure()
-    activities_count = activities_df.groupby(['fecha', 'turno']).size().reset_index(name='count')
+    activities_count = activities_df.groupby(["fecha", "turno"]).size().reset_index(name="count")
     fig = px.density_heatmap(
         activities_count,
-        x='fecha',
-        y='turno',
-        z='count',
-        color_continuous_scale='Viridis',
-        title='Distribución de Actividades'
+        x="fecha",
+        y="turno",
+        z="count",
+        color_continuous_scale="Viridis",
+        title="Distribución de Actividades"
     )
-    fig.update_layout(xaxis_title='Fecha', yaxis_title='Turno', height=400)
+    fig.update_layout(xaxis_title="Fecha", yaxis_title="Turno", height=400)
     return fig
 
 def generate_activity_stats(activities_df):
-    """Genera gráficos estadísticos de actividades.
-       Aplana campos anidados para usar en Plotly."""
     if activities_df.empty:
         return None, None, None
 
-    # Función para extraer el nombre del tipo de actividad
     def extraer_tipo(tipo_info):
         if isinstance(tipo_info, list) and len(tipo_info) > 0:
             return tipo_info[0].get("nombre", "Actividad no definida")
@@ -39,10 +35,8 @@ def generate_activity_stats(activities_df):
             return tipo_info.get("nombre", "Actividad no definida")
         return "Actividad no definida"
 
-    # Aplica la función para crear la columna "tipo_nombre"
     activities_df["tipo_nombre"] = activities_df["tipos_actividad"].apply(extraer_tipo)
 
-    # Función para extraer la sección del usuario
     def extraer_seccion(usuario):
         if isinstance(usuario, list) and len(usuario) > 0:
             return usuario[0].get("seccion", "N/A")
