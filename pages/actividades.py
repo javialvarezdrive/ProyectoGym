@@ -8,9 +8,9 @@ from utils.helpers import format_date
 
 def agendar_actividad():
     st.header("Agendar actividad")
-    st.info("Programa una actividad sin asignar usuario. Podrás asignar usuarios en la pestaña 'Asignar usuarios'.")
+    st.info("Programa una actividad sin asignar usuario. Luego podrás asignar usuarios en la pestaña 'Asignar usuarios'.")
     with st.form("form_agendar"):
-        # Aquí se elimina la asignación de usuario, se agenda con usuario_id = None.
+        # En esta pestaña no se elige usuario; se envía usuario_id = None.
         tipos_df = get_tipos_actividad()
         if tipos_df.empty:
             st.error("No hay tipos de actividad definidos.")
@@ -29,11 +29,21 @@ def agendar_actividad():
             else:
                 st.error("Error al agendar la actividad.")
 
+def extraer_actividad(row):
+    # Extrae el nombre de la actividad desde la información de tipos_actividad 
+    tipo_info = row.get("tipos_actividad")
+    if tipo_info:
+        if isinstance(tipo_info, list) and len(tipo_info) > 0:
+            return tipo_info[0].get("nombre", "Actividad no definida")
+        elif isinstance(tipo_info, dict):
+            return tipo_info.get("nombre", "Actividad no definida")
+    return "Actividad no definida"
+
 def asignar_usuarios():
     st.header("Asignar usuarios a actividades")
-    st.info("Filtra y selecciona una actividad y así asignarle un usuario.")
+    st.info("Filtra y selecciona una actividad para asignarle un usuario.")
     
-    # Rango de fechas por defecto: desde hoy hasta hoy + 1 mes
+    # Rango de fechas por defecto: hoy hasta hoy + 1 mes
     col_a1, col_a2, col_a3 = st.columns(3)
     with col_a1:
          fecha_inicio = st.date_input("Fecha Inicial", value=datetime.today(), key="asig_fecha_inicio")
@@ -47,45 +57,41 @@ def asignar_usuarios():
          "fecha_fin": fecha_fin.isoformat(),
          "turno": filtro_turno
     }
-    df_acts = get_actividades(filtros)  # Se muestran todas las actividades en ese rango
+    df_acts = get_actividades(filtros)  # Todas las actividades en el rango
     
     if not df_acts.empty:
          st.subheader("Actividades en el rango seleccionado")
          datos = []
+         # Construir las columnas para el listado
          for _, row in df_acts.iterrows():
-              # Convertir la fecha a texto
               fecha_str = format_date(row["fecha"])
               turno_val = row.get("turno", "")
-              tipo = row.get("tipos_actividad") or {}
-              actividad = tipo.get("nombre", "Actividad no definida")
-              # Contar asignación: 1 si usuario_id no es nulo; 0 en caso contrario.
+              actividad_nombre = extraer_actividad(row)
+              # Usuarios asignados según campo usuario_id: 1 si tiene, 0 si no tiene
               num_asignados = 1 if row.get("usuario_id") is not None else 0
               datos.append({
                    "Fecha": fecha_str,
                    "Turno": turno_val,
-                   "Actividad": actividad,
+                   "Actividad": actividad_nombre,
                    "Usuarios asignados": num_asignados
               })
          df_disp = pd.DataFrame(datos)
          st.dataframe(df_disp, use_container_width=True)
          
-         # Crear una lista de opciones para elegir la actividad; cada opción muestra
-         # "Fecha - Turno - Actividad" (sin ID)
+         # Preparar opciones del selectbox sin mostrar el ID, con label "Fecha - Turno - Actividad"
          mapping = {}
          opciones = []
          for _, row in df_acts.iterrows():
               fecha_str = format_date(row["fecha"])
               turno_val = row.get("turno", "")
-              tipo = row.get("tipos_actividad") or {}
-              actividad = tipo.get("nombre", "Actividad no definida")
-              label = f"{fecha_str} - {turno_val} - {actividad}"
+              actividad_nombre = extraer_actividad(row)
+              label = f"{fecha_str} - {turno_val} - {actividad_nombre}"
               mapping[label] = row.get("id")
               opciones.append(label)
          actividad_sel = st.selectbox("Seleccione la actividad a la que asignar usuario", opciones)
          actividad_id = mapping.get(actividad_sel)
          
          st.subheader("Filtrar usuarios")
-         # Filtros para usuarios: Nip, nombre, apellidos, sección y grupo
          col_u1, col_u2, col_u3, col_u4, col_u5 = st.columns(5)
          with col_u1:
               filtro_nip = st.text_input("NIP", key="filtro_nip")
